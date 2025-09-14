@@ -22,19 +22,21 @@ dops-onboarding-2026/
 
 Contributing to this repository is simple and can be done by following these steps:
 
-### 1. Fork the Repository
+### 1. Clone the Repository
 
-- Click on the **Fork** button at the top-right of this page to create your own copy of this repository.
-
-### 2. Clone the Repository
-
-- Clone your forked repository to your local machine:
+- Clone this repository to your local machine:
 
   ```bash
-  git clone https://github.com/your-username/dops-onboarding-2026.git
+  git clone https://github.com/hytech-racing/dops-onboarding-2026.git
   ```
 
-  Replace `your-username` with your actual GitHub username.
+### 2. Create your own branch
+
+- Create your own branch that you'll be working in
+
+  ```bash
+  git checkout -b FirstLast
+  ```
 
 ### 3. Create Your Personal Folder
 
