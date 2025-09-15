@@ -1,29 +1,24 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
+func main() {
+	r := chi.NewRouter() // create a chi router
+	r.Use(middleware.Logger) // logs requests and responses
+	r.Get("/", rootHandler) // declare route and handler
+	r.Post("/upload", McapUpload)
 
-
-func main(){
-	r := chi.NewRouter()
-
-
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "hello world")
-	})
-
-
-	addr := ":2000"
-	log.Printf("Server listening on %s\n", addr)
-
-	err := http.ListenAndServe(addr, r)
-	if  err != nil {
-		log.Fatal(err)
+	http.ListenAndServe(":2000", r) // start up server at :3000
 	}
+	func rootHandler(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("Hello World"))
+}
 
+ 
+func McapUpload (w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("Uplaoding"))
 }
