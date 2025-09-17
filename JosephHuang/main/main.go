@@ -58,7 +58,7 @@ func UploadMcap(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(header.Filename)
 	fmt.Println(header.Size)
 
-	if strings.Contains(header.Filename, ".png") || strings.Contains(header.Filename, ".jpg") || strings.Contains(header.Filename, ".jpeg") || header.Header.Get("Content-Type") == "application/jpeg" || header.Header.Get("Content-Type") == "application/png"{
+	if strings.Contains(header.Filename, ".mcap") || header.Header.Get("Content-Type") == "application/mcap"{
 		f := McapFile {
 			Name: header.Filename,
 			Size : int32(header.Size),
@@ -76,7 +76,7 @@ func UploadMcap(w http.ResponseWriter, r *http.Request) {
 	} else {
 		errorMessage := McapError {
 			Err : "Unsupported file type",
-			Message : "The uploaded file type is not allowed. Please upload a .jpg or .png file",
+			Message : "The uploaded file type is not allowed. Please upload a .mcap file",
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnsupportedMediaType)
