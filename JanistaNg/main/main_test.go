@@ -23,7 +23,6 @@ func TestRootHandler(t *testing.T) {
  }
 }
 
-// Helper to create a file upload request
 func newFileUploadRequest(uri, paramName, fileName string, fileContent []byte) (*http.Request, error) {
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
@@ -41,7 +40,6 @@ func newFileUploadRequest(uri, paramName, fileName string, fileContent []byte) (
 	return req, nil
 }
 
-// 1️⃣ Non-POST request should fail
 func TestUploadNonPOST(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/upload", nil)
 	rr := httptest.NewRecorder()
@@ -55,7 +53,6 @@ func TestUploadNonPOST(t *testing.T) {
 	}
 }
 
-// 2️⃣ Non-MCAP upload should return 415
 func TestUploadNonMCAP(t *testing.T) {
 	req, err := newFileUploadRequest("/upload", "file", "test.txt", []byte("hello"))
 	if err != nil {
@@ -77,7 +74,6 @@ func TestUploadNonMCAP(t *testing.T) {
 	}
 }
 
-// 3️⃣ Valid MCAP upload should succeed
 func TestUploadMCAP(t *testing.T) {
 	fileContent := []byte("dummy MCAP content")
 	req, err := newFileUploadRequest("/upload", "file", "test.mcap", fileContent)
