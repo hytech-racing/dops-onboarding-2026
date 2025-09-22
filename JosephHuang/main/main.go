@@ -10,39 +10,37 @@ import (
 )
 
 type McapError struct {
-	Err string `json:"error"`
+	Err     string `json:"error"`
 	Message string `json:"message"`
 }
 
 type McapSuccess struct {
-	Message string `json:"message"`
-	File McapFile `json:"file"`
+	Message string   `json:"message"`
+	File    McapFile `json:"file"`
 }
 
 type McapFile struct {
 	Name string `json:"name"`
-	Size int32 `json:"size"`
+	Size int32  `json:"size"`
 }
 
-
-
+var ByteOffset int = 20
 
 func main() {
-    r := chi.NewRouter()
+	r := chi.NewRouter()
 
-    r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-        w.Write([]byte("Server running on :3000	"))
-    })
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Server running on :3000	"))
+	})
 
 	r.Post("/upload", UploadMcap)
 
-    fmt.Println("Server running on :3000")
-    http.ListenAndServe(":3000", r)
+	fmt.Println("Server running on :3000")
+	http.ListenAndServe(":3000", r)
 }
 
-
 func UploadMcap(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseMultipartForm(1 << 20)
+	err := r.ParseMultipartForm(1 << ByteOffset)
 	if err != nil {
 		http.Error(w, "Unable to parse file", http.StatusBadRequest)
 		return
@@ -58,30 +56,29 @@ func UploadMcap(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(header.Filename)
 	fmt.Println(header.Size)
 
-	if strings.Contains(header.Filename, ".mcap") || header.Header.Get("Content-Type") == "application/mcap"{
-		f := McapFile {
+	if strings.Contains(header.Filename, ".mcap") || header.Header.Get("Content-Type") == "application/mcap" {
+		f := McapFile{
 			Name: header.Filename,
-			Size : int32(header.Size),
+			Size: int32(header.Size),
 		}
-		message := McapSuccess {
+		message := McapSuccess{
 			Message: "MCAP uploaded successfully",
-			File: f,
+			File:    f,
 		}
-
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(message)
 		return
 
 	} else {
-		errorMessage := McapError {
-			Err : "Unsupported file type",
-			Message : "The uploaded file type is not allowed. Please upload a .mcap file",
+		errorMessage := McapError{
+			Err:     "Unsupported file type",
+			Message: "The uploaded file type is not allowed. Please upload a .mcap file",
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnsupportedMediaType)
 		json.NewEncoder(w).Encode(errorMessage)
-		return	
-}
+		return
+	}
 
 }
