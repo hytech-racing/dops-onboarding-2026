@@ -2,25 +2,28 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/go-chi/chi/v5"
 )
+
 func TestRootHandler(t *testing.T) {
- req := httptest.NewRequest(http.MethodGet, "/", nil) // simulate request
- rr := httptest.NewRecorder() // simulate response
- rootHandler(rr, req) // call the root handler 
- if status := rr.Code; status != http.StatusOK { // check status code
- t.Errorf("expected status code %d, got %d", http.StatusOK, status)
- }
- expected := "Hello World"
- if rr.Body.String() != expected { // check the response body
- t.Errorf("expected response body %q, got %q", expected, rr.Body.String())
- }
+	req := httptest.NewRequest(http.MethodGet, "/", nil) // simulate request
+	rr := httptest.NewRecorder()                         // simulate response
+	rootHandler(rr, req)                                 // call the root handler
+	if status := rr.Code; status != http.StatusOK {      // check status code
+		t.Errorf("expected status code %d, got %d", http.StatusOK, status)
+	}
+	expected := "Hello World"
+	if rr.Body.String() != expected { // check the response body
+		t.Errorf("expected response body %q, got %q", expected, rr.Body.String())
+	}
 }
 
 func newFileUploadRequest(uri, paramName, fileName string, fileContent []byte) (*http.Request, error) {
@@ -55,9 +58,7 @@ func TestUploadNonPOST(t *testing.T) {
 
 func TestUploadNonMCAP(t *testing.T) {
 	req, err := newFileUploadRequest("/upload", "file", "test.txt", []byte("hello"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 	rr := httptest.NewRecorder()
 
 	r := chi.NewRouter()
@@ -68,18 +69,20 @@ func TestUploadNonMCAP(t *testing.T) {
 		t.Errorf("Expected 415 Unsupported Media Type, got %d", rr.Code)
 	}
 
-	expectedSubstring := `"error": "Unsupported file type"`
-	if !strings.Contains(rr.Body.String(), expectedSubstring) {
-		t.Errorf("Expected body to contain %q, got %s", expectedSubstring, rr.Body.String())
+	var resp McapError
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if resp.Err != "Unsupported file type" {
+		t.Errorf("unexpected error: %s", resp.Err)
 	}
 }
 
 func TestUploadMCAP(t *testing.T) {
 	fileContent := []byte("dummy MCAP content")
 	req, err := newFileUploadRequest("/upload", "file", "test.mcap", fileContent)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 	rr := httptest.NewRecorder()
 
 	r := chi.NewRouter()
@@ -90,11 +93,19 @@ func TestUploadMCAP(t *testing.T) {
 		t.Errorf("Expected 200 OK, got %d", rr.Code)
 	}
 
-	respBody := rr.Body.String()
-	if !strings.Contains(respBody, `"name": "test.mcap"`) {
-		t.Errorf("Expected response to include filename, got %s", respBody)
+	var resp McapSuccess
+
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
 	}
-	if !strings.Contains(respBody, `"size": 18`) { // 20 bytes for dummy content
-		t.Errorf("Expected response to include correct size, got %s", respBody)
+	if resp.Message != "MCAP uploaded successfully" {
+		t.Errorf("unexpected message: %s", resp.Message)
+	}
+	if resp.File.Name != "test.mcap" {
+		t.Errorf("unexpected file name: %s", resp.File.Name)
+	}
+	expected := int32(len(fileContent))
+	if resp.File.Size != expected {
+		t.Errorf("unexpected file size: %d", resp.File.Size)
 	}
 }
