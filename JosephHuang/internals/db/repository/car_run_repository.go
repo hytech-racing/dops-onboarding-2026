@@ -21,10 +21,13 @@ type MongoCarRunRepository struct {
 	collection *mongo.Collection
 }
 
-func NewMongoCarRepository(db *mongo.Database) *MongoCarRunRepository {
-	return &MongoCarRunRepository{
-		collection: db.Collection("users"),
+func NewMongoCarRepository(db *mongo.Database) (*MongoCarRunRepository, error) {
+	if db == nil {
+		return nil, errors.New("nil *mongo.Database")
 	}
+	return &MongoCarRunRepository{
+		collection: db.Collection("vehicle_run"),
+	}, nil
 }
 
 func (r *MongoCarRunRepository) Create(ctx context.Context, carRun *models.CarRun) error {

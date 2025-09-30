@@ -1,12 +1,20 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"main/internals/db/repository"
+	"main/internals/db/usecase"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type McapError struct {
@@ -27,6 +35,10 @@ type McapFile struct {
 var ByteOffset int = 20
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("no .env file found")
+		return
+	}
 	r := chi.NewRouter()
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -52,10 +64,6 @@ func UploadMcap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println(header.Header)
-	fmt.Println(header.Filename)
-	fmt.Println(header.Size)
-
 	if strings.Contains(header.Filename, ".mcap") || header.Header.Get("Content-Type") == "application/mcap" {
 		f := McapFile{
 			Name: header.Filename,
@@ -65,6 +73,29 @@ func UploadMcap(w http.ResponseWriter, r *http.Request) {
 			Message: "MCAP uploaded successfully",
 			File:    f,
 		}
+
+		ctx := context.Background()
+		mongoURI := os.Getenv("MONGODB_URI")
+		client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+		if err != nil {
+			http.Error(w, "Error: could not create mongo client "+err.Error(), http.StatusInternalServerError)
+
+		}
+		db := client.Database("vehicle_data_db")
+
+		carRunRepo, err := repository.NewMongoCarRepository(db)
+		if err != nil {
+			http.Error(w, "Error: could not create repository "+err.Error(), http.StatusInternalServerError)
+		}
+
+		carRunUseCase := usecase.NewCarRunUseCase(carRunRepo)
+
+		newCarRun, err := carRunUseCase.CreateCarRun(ctx)
+		if err != nil {
+			http.Error(w, "Error: could not insert into mongoDB "+err.Error(), http.StatusInternalServerError)
+		}
+
+		fmt.Println(*newCarRun)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(message)

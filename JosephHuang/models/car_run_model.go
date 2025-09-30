@@ -24,7 +24,7 @@ type File struct {
 
 func NewCarRun(location string, carModel string, eventType string, notes string, file File) CarRun {
 	return CarRun{
-		ID:           primitive.NilObjectID,
+		ID:           primitive.NewObjectID(),
 		DateUploaded: time.Now().UTC(),
 		Location:     location,
 		CarModel:     carModel,
