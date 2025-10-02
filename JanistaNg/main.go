@@ -1,16 +1,45 @@
 package main
 
 import (
+	"JanistaNg/internal/db/repository"
+	"JanistaNg/internal/db/usecase"
+	"JanistaNg/models"
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+//cp2
+var CarRunUseCase *usecase.CarRunUseCase
+
 func main() {
+
+	//cp2 
+	ctx := context.Background()
+	mongoURI := "mongodb://localhost:27017"
+	client, _ := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	db := client.Database("car_runs")
+
+	carRunRepo := repository.NewMongoCarRunRepository(db)
+	carRunUseCase := usecase.NewCarRunUseCase(carRunRepo)
+
+	newCarRun, err := carRunUseCase.CreateCarRunUseCase(ctx)
+
+	if err != nil {
+		log.Fatal("Failed to create CarRun:", err)
+	}
+	fmt.Println("Created CarRun:", newCarRun)
+
 	r := chi.NewRouter()     // create a chi router
 	r.Use(middleware.Logger) // logs requests and responses
 	r.Get("/", rootHandler)  // declare route and handler
@@ -66,6 +95,21 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if len(fileSize) != int(header.Size) {
 		http.Error(w, "File size mismatch, file uploaded is not file received", http.StatusBadRequest)
 		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	carRun, err := CarRunUseCase.CreateCarRunUseCase(ctx)
+	if err != nil {
+		http.Error(w, "Failed to create CarRun: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	carRun.File = models.FileInfo{
+		AwsBucket: "",
+		FilePath: "", 
+		FileName: header.Filename,
 	}
 
 	// if nothing errors --> success msg
