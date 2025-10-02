@@ -45,13 +45,31 @@ func main() {
 		w.Write([]byte("Server running on :3000	"))
 	})
 
-	r.Post("/upload", UploadMcap)
+	ctx := context.Background()
+	mongoURI := os.Getenv("MONGODB_URI")
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		panic("Error: could not create repo client")
+
+	}
+	db := client.Database("vehicle_data_db")
+
+	carRunRepo, err := repository.NewMongoCarRepository(db)
+	if err != nil {
+		panic("Error: could not create repo")
+	}
+
+	carRunUseCase := usecase.NewCarRunUseCase(carRunRepo)
+
+	r.Post("/upload", func(w http.ResponseWriter, r *http.Request) {
+		UploadMcap(ctx, carRunUseCase, w, r)
+	})
 
 	fmt.Println("Server running on :3000")
 	http.ListenAndServe(":3000", r)
 }
 
-func UploadMcap(w http.ResponseWriter, r *http.Request) {
+func UploadMcap(ctx context.Context, carRunUseCase *usecase.CarRunUseCase, w http.ResponseWriter, r *http.Request) {
 	err := r.ParseMultipartForm(1 << ByteOffset)
 	if err != nil {
 		http.Error(w, "Unable to parse file", http.StatusBadRequest)
@@ -73,22 +91,6 @@ func UploadMcap(w http.ResponseWriter, r *http.Request) {
 			Message: "MCAP uploaded successfully",
 			File:    f,
 		}
-
-		ctx := context.Background()
-		mongoURI := os.Getenv("MONGODB_URI")
-		client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
-		if err != nil {
-			http.Error(w, "Error: could not create mongo client "+err.Error(), http.StatusInternalServerError)
-
-		}
-		db := client.Database("vehicle_data_db")
-
-		carRunRepo, err := repository.NewMongoCarRepository(db)
-		if err != nil {
-			http.Error(w, "Error: could not create repository "+err.Error(), http.StatusInternalServerError)
-		}
-
-		carRunUseCase := usecase.NewCarRunUseCase(carRunRepo)
 
 		newCarRun, err := carRunUseCase.CreateCarRun(ctx)
 		if err != nil {
