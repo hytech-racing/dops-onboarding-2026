@@ -19,12 +19,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-//cp2
+// cp2
 var CarRunUseCase *usecase.CarRunUseCase
 
 func main() {
 
-	//cp2 
+	//cp2
 	ctx := context.Background()
 	mongoURI := "mongodb://localhost:27017"
 	client, _ := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
@@ -108,8 +108,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	carRun.File = models.FileInfo{
 		AwsBucket: "",
-		FilePath: "", 
-		FileName: header.Filename,
+		FilePath:  "",
+		FileName:  header.Filename,
 	}
 
 	// if nothing errors --> success msg
