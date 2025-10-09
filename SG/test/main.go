@@ -7,8 +7,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
-
-	"github.com/foxglove/mcap/go/mcap"
 )
 
 func main() {
@@ -25,32 +23,12 @@ func main() {
 		return
 	}
 
-	fmt.Print(isMCAP("mcap.mcap"))
-
 	err_2 := upload("http://localhost:3000/upload", "blank.txt")
 	if err_2 != nil {
 		fmt.Printf("Error: %v\n", err_2)
 		return
 	}
 
-}
-
-func isMCAP(filename string) (bool, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return false, err
-	}
-	defer file.Close()
-
-	reader, err := mcap.NewReader(file)
-	if err != nil {
-		return false, nil // Not an MCAP file or corrupted
-	}
-	defer reader.Close()
-
-	return true, nil
-
-	// If we get here without error, it's a valid MCAP file
 }
 
 func upload(url, filePath string) error {

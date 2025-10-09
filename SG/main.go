@@ -1,16 +1,19 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"main/internal/db/repository"
+	"main/internal/db/usecase"
 )
 
 type UploadResponse struct {
@@ -28,36 +31,41 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
-func main() {
+var carRunUsecase *usecase.CarRunUseCase
 
+func main() {
+	// ====== MongoDB Setup ======
+	ctx := context.Background()
+	mongoURI := "mongodb://localhost:27017"
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		panic(fmt.Sprintf("Failed to connect to MongoDB: %v", err))
+	}
+	defer client.Disconnect(ctx)
+
+	db := client.Database("hytech") // or your DB name
+	carRunRepo := repository.NewMongoCarRunRepository(db)
+	carRunUsecase = usecase.NewCarRunUseCase(carRunRepo)
+
+	// ====== HTTP Router ======
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	//The logger will log information about
-	// incoming requests like the request method,
-	// path, and the response status.
-
-	os.MkdirAll("./uploads", os.ModePerm)
-
 	r.Post("/upload", uploadHandler)
 
-	// After that, you need to set up a route to
-	// the root path that listens for GET
-	// requests and returns an OK back to the client:
-
-	//starts server
 	fmt.Println("Server running on :3000")
 	http.ListenAndServe(":3000", r)
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
-
+	// Parse multipart form (max 100 MB)
 	if err := r.ParseMultipartForm(100 << 20); err != nil {
 		sendJSONError(w, "Bad request", "Unable to parse form data", http.StatusBadRequest)
 		return
 	}
 
+	// Get file from form
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		sendJSONError(w, "Bad request", "No file provided in the request", http.StatusBadRequest)
@@ -65,69 +73,41 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	if success, err := isMCAP(header.Filename); err != nil || success != true {
+	// Validate file extension (simple check)
+	if success, _ := isMCAP(header.Filename); !success {
 		sendJSONError(w, "Unsupported file type",
 			"The uploaded file type is not allowed. Please upload a .mcap file.", http.StatusUnsupportedMediaType)
 		return
 	}
 
-	// Create destination file
-	dstPath := filepath.Join("./uploads", header.Filename)
-	dst, err := os.Create(dstPath)
+	// ✅ CHECKPOINT 2: Create CarRun record in MongoDB
+	_, err = carRunUsecase.CreateCarRunUseCase(r.Context())
 	if err != nil {
-		sendJSONError(w, "Internal server error", "Failed to create file on server", http.StatusInternalServerError)
-		return
-	}
-	defer dst.Close()
-
-	// Copy file content and get size
-	size, err := io.Copy(dst, file)
-	if err != nil {
-		sendJSONError(w, "Internal server error", "Failed to save file", http.StatusInternalServerError)
+		sendJSONError(w, "Internal server error", "Failed to create car run record", http.StatusInternalServerError)
 		return
 	}
 
-	// Return success response
+	// Success response (no file saved, so size = 0 or omit)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(UploadResponse{
-		Message: "MCAP uploaded successfully",
+		Message: "MCAP upload initiated – metadata recorded",
 		File: FileInfo{
 			Name: header.Filename,
-			Size: size,
+			Size: 0, // since we're not reading/saving the file
 		},
 	})
 }
 
-// IsMCAPFile checks if a file is an MCAP file by examining its magic bytes.
 func isMCAP(filename string) (bool, error) {
-	if strings.HasSuffix(strings.ToLower(filename), ".mcap") {
-		return true, nil
-	}
-	// file, err := os.Open(filename)
-	// if err != nil {
-	// 	return false, err
-	// }
-	// defer file.Close()
-
-	// reader, err := mcap.NewReader(file)
-	// if err != nil {
-	// 	return false, nil // Not an MCAP file or corrupted
-	// }
-	// defer reader.Close()
-
-	// // If we get here without error, it's a valid MCAP file
-	return false, nil
+	return strings.HasSuffix(strings.ToLower(filename), ".mcap"), nil
 }
 
-// Helper function for error responses
 func sendJSONError(w http.ResponseWriter, errorMsg, message string, statusCode int) {
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(ErrorResponse{
 		Error:   errorMsg,
 		Message: message,
 	})
-
 }
