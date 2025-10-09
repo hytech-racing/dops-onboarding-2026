@@ -6,9 +6,7 @@ import (
 	"JanistaNg/models"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -19,8 +17,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// cp2
-var CarRunUseCase *usecase.CarRunUseCase
 
 func main() {
 
@@ -33,17 +29,12 @@ func main() {
 	carRunRepo := repository.NewMongoCarRunRepository(db)
 	carRunUseCase := usecase.NewCarRunUseCase(carRunRepo)
 
-	newCarRun, err := carRunUseCase.CreateCarRunUseCase(ctx)
-
-	if err != nil {
-		log.Fatal("Failed to create CarRun:", err)
-	}
-	fmt.Println("Created CarRun:", newCarRun)
-
 	r := chi.NewRouter()     // create a chi router
 	r.Use(middleware.Logger) // logs requests and responses
 	r.Get("/", rootHandler)  // declare route and handler
-	r.Post("/upload", uploadHandler)
+	r.Post("/upload", func(w http.ResponseWriter, r *http.Request) {
+		uploadHandler(w, r, carRunUseCase)
+	})
 	http.ListenAndServe(":3000", r) // start up server at :3000
 }
 
@@ -66,7 +57,7 @@ type McapFile struct {
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hello World"))
 }
-func uploadHandler(w http.ResponseWriter, r *http.Request) {
+func uploadHandler(w http.ResponseWriter, r *http.Request, carRunUseCase *usecase.CarRunUseCase) {
 	r.ParseMultipartForm(10 << 20)
 
 	file, header, err := r.FormFile("file")
@@ -100,7 +91,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	carRun, err := CarRunUseCase.CreateCarRunUseCase(ctx)
+	carRun, err := carRunUseCase.CreateCarRunUseCase(ctx)
 	if err != nil {
 		http.Error(w, "Failed to create CarRun: "+err.Error(), http.StatusInternalServerError)
 		return
