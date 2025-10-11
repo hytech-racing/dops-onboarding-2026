@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
-	"main/internals/db/repository"
+	"main/internal/db/repository"
 	"main/models"
 )
 
