@@ -1,12 +1,20 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"main/internal/db/repository"
+	"main/internal/db/usecase"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type McapError struct {
@@ -27,19 +35,41 @@ type McapFile struct {
 var ByteOffset int = 20
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("no .env file found")
+		return
+	}
 	r := chi.NewRouter()
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Server running on :3000	"))
 	})
 
-	r.Post("/upload", UploadMcap)
+	ctx := context.Background()
+	mongoURI := os.Getenv("MONGODB_URI")
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		panic("Error: could not create repo client")
+
+	}
+	db := client.Database("vehicle_data_db")
+
+	carRunRepo, err := repository.NewMongoCarRepository(db)
+	if err != nil {
+		panic("Error: could not create repo")
+	}
+
+	carRunUseCase := usecase.NewCarRunUseCase(carRunRepo)
+
+	r.Post("/upload", func(w http.ResponseWriter, r *http.Request) {
+		UploadMcap(ctx, carRunUseCase, w, r)
+	})
 
 	fmt.Println("Server running on :3000")
 	http.ListenAndServe(":3000", r)
 }
 
-func UploadMcap(w http.ResponseWriter, r *http.Request) {
+func UploadMcap(ctx context.Context, carRunUseCase *usecase.CarRunUseCase, w http.ResponseWriter, r *http.Request) {
 	err := r.ParseMultipartForm(1 << ByteOffset)
 	if err != nil {
 		http.Error(w, "Unable to parse file", http.StatusBadRequest)
@@ -52,10 +82,6 @@ func UploadMcap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println(header.Header)
-	fmt.Println(header.Filename)
-	fmt.Println(header.Size)
-
 	if strings.Contains(header.Filename, ".mcap") || header.Header.Get("Content-Type") == "application/mcap" {
 		f := McapFile{
 			Name: header.Filename,
@@ -65,6 +91,13 @@ func UploadMcap(w http.ResponseWriter, r *http.Request) {
 			Message: "MCAP uploaded successfully",
 			File:    f,
 		}
+
+		newCarRun, err := carRunUseCase.CreateCarRun(ctx)
+		if err != nil {
+			http.Error(w, "Error: could not insert into mongoDB "+err.Error(), http.StatusInternalServerError)
+		}
+
+		fmt.Println(*newCarRun)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(message)
