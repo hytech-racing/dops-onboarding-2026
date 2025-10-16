@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"context"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -89,12 +90,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-
 	ctx := context.Background()
-	carRun, err := carRunUseCase.CreateCarRunUseCase(ctx)
+	_, err = carRunUseCase.CreateCarRunUseCase(ctx)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -106,6 +103,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	
 	fileInfo := McapFile{
 		Name: filename,
 		Size: header.Size,
