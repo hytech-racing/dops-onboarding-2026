@@ -60,7 +60,7 @@ Contributing to this repository is simple and can be done by following these ste
 - Push the committed changes to your forked repository:
 
   ```bash
-  git push origin main
+  git push
   ```
 
 ### 7. Create a Pull Request (PR)
