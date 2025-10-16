@@ -6,12 +6,12 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
-
+	"os"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-
+	"github.com/joho/godotenv"
 	"KushagraGoel/internal/db/repository"
 	"KushagraGoel/internal/db/usecase"
 )
@@ -56,10 +56,11 @@ func uploadHandler(w http.ResponseWriter, r *http.Request, carRunUseCase *usecas
 }
 
 func main() {
+	godotenv.Load()
 	ctx := context.Background()
 
 	// Connect to MongoDB
-	mongoURI := "mongodb://localhost:27017"
+	mongoURI := os.Getenv("MONGODB_URI")
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
 	if err != nil {
 		log.Fatalf("failed to connect to MongoDB: %v", err)

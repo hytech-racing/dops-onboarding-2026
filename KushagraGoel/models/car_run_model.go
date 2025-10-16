@@ -1,7 +1,6 @@
 package models
 
 import (
-	"errors"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -24,13 +23,6 @@ type FileInfo struct {
 }
 
 func NewCar(location, car_model, event_type, notes, aws_bucket, file_path, file_name string) (*Car_Run, error) {
-	if location == "" {
-		return nil, errors.New("location is required")
-	}
-	if car_model == "" {
-		return nil, errors.New("car model is required")
-	}
-
 	return &Car_Run{
 		ID:            primitive.NewObjectID(),
 		Date_uploaded: time.Now().Format(time.RFC3339),
