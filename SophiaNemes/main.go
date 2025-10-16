@@ -4,9 +4,17 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"context"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"SophiaNemes/internal/db/repository"
+	"SophiaNemes/internal/db/usecase"
+	"github.com/joho/godotenv"
+
 )
 
 // JSON response structs
@@ -25,7 +33,23 @@ type McapError struct {
 	Message string `json:"message"`
 }
 
+var carRunUseCase *usecase.CarRunUseCase
+
 func main() {
+	godotenv.Load()
+	ctx := context.Background()
+	mongoURI := os.Getenv("MONGODB_URI")
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		panic(err)
+	}
+	defer client.Disconnect(ctx)
+
+	db := client.Database("dops")
+
+	carRunRepo := repository.NewMongoCarRunRepository(db)
+	carRunUseCase = usecase.NewCarRunUseCase(carRunRepo)
+	
 	r := chi.NewRouter()     // create a chi router
 	r.Use(middleware.Logger) // logs requests and responses
 	r.Get("/", rootHandler)  // declare route and handler
@@ -67,6 +91,20 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+
+
+	ctx := context.Background()
+	carRun, err := carRunUseCase.CreateCarRunUseCase(ctx)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		errorResp := McapError{
+			Err:     "Database error",
+			Message: "Failed to create car run record",
+		}
+		json.NewEncoder(w).Encode(errorResp)
+		return
+	}
 
 	fileInfo := McapFile{
 		Name: filename,
