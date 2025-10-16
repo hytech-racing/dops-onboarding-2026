@@ -34,8 +34,6 @@ type McapError struct {
 	Message string `json:"message"`
 }
 
-var carRunUseCase *usecase.CarRunUseCase
-
 func main() {
 	godotenv.Load()
 	ctx := context.Background()
@@ -49,12 +47,14 @@ func main() {
 	db := client.Database("dops")
 
 	carRunRepo := repository.NewMongoCarRunRepository(db)
-	carRunUseCase = usecase.NewCarRunUseCase(carRunRepo)
+	carRunUseCase := usecase.NewCarRunUseCase(carRunRepo)
 	
 	r := chi.NewRouter()     // create a chi router
 	r.Use(middleware.Logger) // logs requests and responses
 	r.Get("/", rootHandler)  // declare route and handler
-	r.Post("/upload", uploadHandler)
+	r.Post("/upload", func(w http.ResponseWriter, r *http.Request) {
+		uploadHandler(w, r, carRunUseCase)
+	})
 	http.ListenAndServe(":3000", r) // start up server at :3000
 }
 
@@ -62,7 +62,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hello World"))
 }
 
-func uploadHandler(w http.ResponseWriter, r *http.Request) {
+func uploadHandler(w http.ResponseWriter, r *http.Request, carRunUseCase *usecase.CarRunUseCase) {
 	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
 		http.Error(w, "Unable to parse form", http.StatusBadRequest)
