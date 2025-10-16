@@ -2,79 +2,87 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRootHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil) // simulate request
 	rr := httptest.NewRecorder()                         // simulate response
 	rootHandler(rr, req)                                 // call the root handler
-	if status := rr.Code; status != http.StatusOK {      // check status code
-		t.Errorf("expected status code %d, got %d", http.StatusOK, status)
-	}
+	require.Equal(t, http.StatusOK, rr.Code)            // use require instead of manual if check
 	expected := "Hello World"
-	if rr.Body.String() != expected { // check the response body
-		t.Errorf("expected response body %q, got %q", expected, rr.Body.String())
-	}
+	require.Equal(t, expected, rr.Body.String()) // use require for cleaner assertions
 }
+
 func TestUploadNonPost(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/upload", nil)
 	rr := httptest.NewRecorder()
 	uploadHandler(rr, req)
-	
-	if status := rr.Code; status != http.StatusBadRequest {
-		t.Errorf("expected status code %d, got %d", http.StatusBadRequest, status)
-	}
+
+	require.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
 func TestUploadNonMCAP(t *testing.T) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
+	defer writer.Close()
+
 	fileWriter, err := writer.CreateFormFile("file", "test.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	fileWriter.Write([]byte("hello"))
-	writer.Close()
-	
+	require.Nil(t, err)
+
+	testFileContent := []byte("hello")
+	_, err = fileWriter.Write(testFileContent)
+	require.Nil(t, err)
+
+	err = writer.Close()
+	require.Nil(t, err)
+
 	req := httptest.NewRequest(http.MethodPost, "/upload", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	rr := httptest.NewRecorder()
 	uploadHandler(rr, req)
-	
-	if status := rr.Code; status != http.StatusUnsupportedMediaType {
-		t.Errorf("expected status code %d, got %d", http.StatusUnsupportedMediaType, status)
-	}
-	
-	if !strings.Contains(rr.Body.String(), "Unsupported file type") {
-		t.Errorf("expected response to contain 'Unsupported file type'")
-	}
+
+	require.Equal(t, http.StatusUnsupportedMediaType, rr.Code)
+
+	 
+	resp := McapError{}
+	err = json.NewDecoder(rr.Body).Decode(&resp)
+	require.Nil(t, err)
+	require.Equal(t, "Unsupported file type", resp.Err)
 }
 
 func TestUploadMCAP(t *testing.T) {
-    body := &bytes.Buffer{}
-    writer := multipart.NewWriter(body)
-    fileWriter, err := writer.CreateFormFile("file", "test.mcap")
-    if err != nil {
-        t.Fatal(err)
-    }
-    fileWriter.Write([]byte("fake mcap data"))
-    writer.Close()
-    
-    req := httptest.NewRequest(http.MethodPost, "/upload", body)
-    req.Header.Set("Content-Type", writer.FormDataContentType())
-    rr := httptest.NewRecorder()
-    uploadHandler(rr, req)
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	defer writer.Close()
 
-    if status := rr.Code; status != http.StatusOK {
-        t.Errorf("expected status code %d, got %d", http.StatusOK, status)
-    }
-    
-    if !strings.Contains(rr.Body.String(), "test.mcap") {
-        t.Errorf("expected response to contain filename 'test.mcap'")
-    }
+	fileWriter, err := writer.CreateFormFile("file", "test.mcap")
+	require.Nil(t, err)
+
+	fileContent := []byte("fake mcap data")
+	_, err = fileWriter.Write(fileContent)
+	require.Nil(t, err)
+
+	err = writer.Close()
+	require.Nil(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/upload", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	rr := httptest.NewRecorder()
+	uploadHandler(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	
+	resp := McapSuccess{}
+	err = json.NewDecoder(rr.Body).Decode(&resp)
+	require.Nil(t, err)
+	require.Equal(t, "test.mcap", resp.File.Name)
+	require.Equal(t, int64(len(fileContent)), resp.File.Size)
+	require.Equal(t, "MCAP uploaded successfully", resp.Message)
 }
