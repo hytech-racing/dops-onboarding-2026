@@ -27,7 +27,7 @@ func TestUploadHandler_WrongMethod(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/upload", nil)
 	w := httptest.NewRecorder()
 
-	uploadHandler(w, req)
+	uploadHandler(w, req, nil)
 
 	resp := w.Result()
 	if resp.StatusCode != http.StatusMethodNotAllowed {
@@ -39,7 +39,7 @@ func TestUploadHandler_InvalidFileType(t *testing.T) {
 	req := newFileUploadRequest(http.MethodPost, "/upload", "file.png", []byte("fake content"))
 	w := httptest.NewRecorder()
 
-	uploadHandler(w, req)
+	uploadHandler(w, req, nil)
 
 	resp := w.Result()
 	if resp.StatusCode != http.StatusUnsupportedMediaType {
@@ -55,7 +55,7 @@ func TestUploadHandler_ValidMCAP(t *testing.T) {
 	req := newFileUploadRequest(http.MethodPost, "/upload", "test.mcap", []byte("fake content"))
 	w := httptest.NewRecorder()
 
-	uploadHandler(w, req)
+	uploadHandler(w, req,nil)
 
 	resp := w.Result()
 	if resp.StatusCode != http.StatusOK {
